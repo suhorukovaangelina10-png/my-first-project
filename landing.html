@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow — умный кухонный планировщик</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f1a;
+      --bg2:       #131627;
+      --accent1:   #6c63ff;
+      --accent2:   #ff6584;
+      --accent3:   #43e97b;
+      --card-bg:   rgba(255,255,255,0.04);
+      --border:    rgba(255,255,255,0.08);
+      --text:      #e8eaf6;
+      --muted:     #8892b0;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* ── GLOW BLOBS ── */
+    .blob {
+      position: fixed; border-radius: 50%;
+      filter: blur(120px); opacity: 0.18;
+      pointer-events: none; z-index: 0;
+      animation: drift 14s ease-in-out infinite alternate;
+    }
+    .blob-1 { width: 520px; height: 520px; background: var(--accent1); top: -160px; left: -160px; }
+    .blob-2 { width: 400px; height: 400px; background: var(--accent2); bottom: -100px; right: -100px; animation-delay: -7s; }
+    .blob-3 { width: 300px; height: 300px; background: var(--accent3); top: 50%; left: 55%; animation-delay: -3s; }
+    @keyframes drift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(40px, 30px) scale(1.08); }
+    }
+
+    /* ── WRAPPER ── */
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(16px);
+      background: rgba(13,15,26,0.75);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .wrap {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-top: 14px; padding-bottom: 14px;
+    }
+    .logo {
+      font-size: 1.2rem; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      color: #fff; border: none; padding: 8px 20px;
+      border-radius: 50px; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: opacity .2s, transform .2s;
+    }
+    .nav-cta:hover { opacity: .85; transform: translateY(-1px); }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 110px 0 80px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(108,99,255,0.15);
+      border: 1px solid rgba(108,99,255,0.35);
+      color: #a29bfe; font-size: 0.8rem; font-weight: 600;
+      padding: 5px 16px; border-radius: 50px;
+      margin-bottom: 28px; letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 4.2rem);
+      font-weight: 800; line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #a29bfe 0%, #fd79a8 50%, var(--accent3) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      color: var(--muted); max-width: 560px;
+      margin: 0 auto 44px;
+    }
+
+    /* ── CTA BUTTON ── */
+    .cta-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .btn-cta {
+      position: relative;
+      display: inline-flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      color: #fff; font-size: 1.05rem; font-weight: 700;
+      padding: 16px 40px; border-radius: 50px;
+      border: none; cursor: pointer; text-decoration: none;
+      animation: pulse-cta 2.4s ease-in-out infinite;
+      transition: transform .2s;
+    }
+    .btn-cta:hover { transform: scale(1.04); animation-play-state: paused; }
+    @keyframes pulse-cta {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(108,99,255,.55); }
+      50%       { box-shadow: 0 0 0 18px rgba(108,99,255,0); }
+    }
+    .btn-cta svg { flex-shrink: 0; }
+    .contact-link {
+      font-size: 0.82rem; color: var(--muted);
+    }
+    .contact-link a {
+      color: #a29bfe; text-decoration: none;
+      border-bottom: 1px dashed rgba(162,155,254,.4);
+      transition: color .2s;
+    }
+    .contact-link a:hover { color: #fff; }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      text-align: center; margin-bottom: 56px;
+    }
+    .section-label h2 {
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      font-weight: 700; margin-bottom: 10px;
+    }
+    .section-label p { color: var(--muted); font-size: 1rem; max-width: 520px; margin: 0 auto; }
+
+    /* ── FEATURES ── */
+    .features { padding: 80px 0; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .features-grid-bottom {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      max-width: 760px;
+      margin: 20px auto 0;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px 28px;
+      transition: transform .25s, border-color .25s, background .25s;
+    }
+    .card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(108,99,255,.4);
+      background: rgba(108,99,255,.07);
+    }
+    .icon-box {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    .icon-box.purple { background: rgba(108,99,255,.18); }
+    .icon-box.pink   { background: rgba(255,101,132,.18); }
+    .icon-box.green  { background: rgba(67,233,123,.18); }
+    .icon-box.cyan   { background: rgba(0,206,255,.18); }
+    .icon-box.orange { background: rgba(255,180,0,.18); }
+
+    .card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    .card p  { font-size: 0.88rem; color: var(--muted); line-height: 1.65; }
+
+    /* ── FOR WHOM ── */
+    .audience { padding: 80px 0; }
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .aud-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      display: flex; gap: 16px; align-items: flex-start;
+      transition: transform .25s, border-color .25s;
+    }
+    .aud-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(67,233,123,.35);
+    }
+    .aud-icon {
+      flex-shrink: 0;
+      width: 46px; height: 46px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(67,233,123,.14);
+      font-size: 1.4rem;
+    }
+    .aud-card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; }
+    .aud-card p  { font-size: 0.84rem; color: var(--muted); }
+
+    /* ── BOTTOM CTA ── */
+    .bottom-cta {
+      padding: 90px 0 100px;
+      text-align: center;
+    }
+    .bottom-cta h2 {
+      font-size: clamp(1.7rem, 4vw, 2.8rem);
+      font-weight: 800; margin-bottom: 14px;
+    }
+    .bottom-cta p { color: var(--muted); margin-bottom: 44px; max-width: 480px; margin-left: auto; margin-right: auto; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      width: 100%; height: 1px;
+      background: var(--border);
+      margin: 0 auto;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .features-grid-bottom { grid-template-columns: 1fr; max-width: 100%; }
+      nav .wrap { gap: 12px; }
+    }
+    @media (max-width: 500px) {
+      .hero { padding: 80px 0 60px; }
+      .card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Glow blobs -->
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="wrap">
+    <span class="logo">TaskFlow</span>
+    <a class="nav-cta" href="#cta">Попробовать бесплатно</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="badge">Кухонный планировщик нового поколения</div>
+    <h1>
+      <span class="gradient-text">TaskFlow</span><br/>
+      Умный кухонный планировщик
+    </h1>
+    <p class="hero-sub">
+      Вся ваша кухня — в кармане. Планируйте меню, экономьте бюджет и
+      готовьте с удовольствием каждый день.
+    </p>
+    <div class="cta-wrap" id="cta">
+      <a class="btn-cta" href="#bottom-cta">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        Начать бесплатно
+      </a>
+      <p class="contact-link">
+        Есть вопросы? <a href="mailto:hello@taskflow.app">Напишите нам → hello@taskflow.app</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="wrap">
+    <div class="section-label">
+      <h2>Почему <span class="gradient-text">TaskFlow</span>?</h2>
+      <p>Пять мощных инструментов, которые изменят ваш подход к готовке и покупкам</p>
+    </div>
+
+    <!-- Top row: 3 cards -->
+    <div class="features-grid">
+
+      <!-- 1 -->
+      <div class="card">
+        <div class="icon-box purple">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a29bfe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+            <polyline points="2 17 6 13 10 17 14 9 18 13 22 7"/>
+          </svg>
+        </div>
+        <h3>Умная статистика расхода</h3>
+        <p>Отслеживайте, сколько и каких продуктов уходит за неделю. Видите тренды, выявляете перерасход и экономите до 30% семейного бюджета.</p>
+      </div>
+
+      <!-- 2 -->
+      <div class="card">
+        <div class="icon-box pink">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fd79a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="2"/>
+            <line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+            <polyline points="15 10 16.5 11.5 19 9"/>
+          </svg>
+        </div>
+        <h3>Авто-список продуктов</h3>
+        <p>На основе запланированного меню TaskFlow сам генерирует точный список покупок. Забудьте о лишних поездках в магазин.</p>
+      </div>
+
+      <!-- 3 -->
+      <div class="card">
+        <div class="icon-box green">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#43e97b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+            <line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/>
+            <line x1="16" y1="14" x2="16" y2="14"/>
+            <line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/>
+          </svg>
+        </div>
+        <h3>Планировщик меню</h3>
+        <p>Составляйте меню на неделю вперёд в пару кликов. Сбалансированное питание для всей семьи без ежедневного «что приготовить?».</p>
+      </div>
+    </div>
+
+    <!-- Bottom row: 2 cards centered -->
+    <div class="features-grid-bottom">
+
+      <!-- 4 -->
+      <div class="card">
+        <div class="icon-box cyan">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00ceff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <path d="M11 8a3 3 0 0 1 3 3"/>
+          </svg>
+        </div>
+        <h3>Блюдо из имеющегося</h3>
+        <p>Открыли холодильник — а там «ничего нет»? TaskFlow подберёт рецепты именно из тех продуктов, которые уже есть у вас дома.</p>
+      </div>
+
+      <!-- 5 -->
+      <div class="card">
+        <div class="icon-box orange">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffb400" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <h3>Совместный доступ</h3>
+        <p>Вся семья или команда в одном пространстве. Делитесь списком покупок, меню и рецептами в реальном времени — без пересылки скриншотов.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FOR WHOM -->
+<section class="audience">
+  <div class="wrap">
+    <div class="section-label">
+      <h2>Для кого <span class="gradient-text">TaskFlow</span>?</h2>
+      <p>Приложение создано для всех, кто хочет готовить умнее и тратить меньше</p>
+    </div>
+
+    <div class="audience-grid">
+      <div class="aud-card">
+        <div class="aud-icon">👨‍👩‍👧‍👦</div>
+        <div>
+          <h4>Семьи с детьми</h4>
+          <p>Планируйте питание для всех членов семьи, учитывайте предпочтения каждого и никогда не забывайте ничего в магазине.</p>
+        </div>
+      </div>
+      <div class="aud-card">
+        <div class="aud-icon">💼</div>
+        <div>
+          <h4>Занятые профессионалы</h4>
+          <p>Готовьтесь к неделе за 10 минут воскресным вечером. Автоматический список сэкономит час вашего времени каждую неделю.</p>
+        </div>
+      </div>
+      <div class="aud-card">
+        <div class="aud-icon">🥗</div>
+        <div>
+          <h4>Те, кто следит за питанием</h4>
+          <p>Контролируйте баланс БЖУ, отслеживайте потребление продуктов и достигайте своих нутрициональных целей без усилий.</p>
+        </div>
+      </div>
+      <div class="aud-card">
+        <div class="aud-icon">💰</div>
+        <div>
+          <h4>Экономные покупатели</h4>
+          <p>Статистика расходов покажет, на что уходят деньги. Покупайте ровно столько, сколько нужно — без выброшенных продуктов.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- BOTTOM CTA -->
+<section class="bottom-cta" id="bottom-cta">
+  <div class="wrap">
+    <h2>Начните готовить умнее<br/><span class="gradient-text">уже сегодня</span></h2>
+    <p>Первые 30 дней бесплатно — без карты, без обязательств. Просто попробуйте.</p>
+    <div class="cta-wrap">
+      <a class="btn-cta" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+        Скачать приложение
+      </a>
+      <p class="contact-link">
+        Вопросы и партнёрство → <a href="mailto:hello@taskflow.app">hello@taskflow.app</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 TaskFlow. Все права защищены.</p>
+</footer>
+
+</body>
+</html>
